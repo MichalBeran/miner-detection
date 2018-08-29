@@ -1,0 +1,47 @@
+#!/bin/bash
+
+POSITIONAL=()
+while [[ $# -gt 0 ]]
+do
+	key="$1"
+	case $key in
+		-p|--pid)
+			PID="$2"
+			shift
+			shift
+			;;
+	esac
+done
+set -- "${POSITIONAL[@]}"
+
+if [ -z "$PID" ] ; then
+	echo "use parameter -p or --pid for PID of process"
+	exit 3
+fi
+
+whitelist=$(cat /var/lib/examine/examine | sed 's/^/"/;s/$/"/')
+
+listed=false
+path=$( ls -l /proc/$PID/exe | sed -e 's/.* -> //' | sed 's/(deleted)//' )
+if [ ! -z "$path" ] ; then
+	for y in $whitelist;
+		do 
+			check=$(echo $y | sed -e 's/^"//' -e 's/"$//')
+			if echo ${path} | grep -qe "$check" ; then
+				listed=true
+			fi				
+	done;
+	if test "$listed" = "false" ; then
+		res=$(echo "n" | minerchk -d $path)
+	fi
+fi
+
+results=$(cat /usr/local/minerchk/miner.* 2>/dev/null | sed 's/:.*//')
+if [ ! -z "$results" ] ; then
+	echo $results
+	$(rm /usr/local/minerchk/miner.* 2>/dev/null)
+	exit 1
+else
+	$(rm /usr/local/minerchk/miner.* 2>/dev/null)
+	exit 0
+fi
